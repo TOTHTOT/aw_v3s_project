@@ -2,7 +2,7 @@
  * @Description: gpio 方式驱动rgbled
  * @Author: TOTHTOT
  * @Date: 2023-03-01 14:24:06
- * @LastEditTime: 2023-09-28 17:51:54
+ * @LastEditTime: 2023-09-30 11:34:49
  * @LastEditors: TOTHTOT
  * @FilePath: /aw_v3s_project/01_ctrl_rgbled/rgbled_drive.c
  */
@@ -39,7 +39,7 @@
 #define DEVTREE_NODE_COMPAT "compatible" // 设备树中节点compatible
 #define DEVTREE_NODE_COMPAT_INFO "tothtot,rgb_leds" // 设备树中节点compatible
 
-// led status
+// rgbled状态, 必须保持xxx_on是奇数, xxx_off是偶数,且xxx_on在对应的xxx_off前面
 typedef enum
 {
     RGBLED_STATUS_NONE,
@@ -140,13 +140,13 @@ static int32_t led_write(struct file *p_file, const char __user *buf, size_t cou
         printk(KERN_ERR "copy_from_user failed %d\n", ret);
         return -EFAULT;
     }
-    // printk(KERN_ERR "write = %d\n", data_buf[0]);
+    // printk(KERN_ERR "write = %d\n", led_status);
     switch (led_status)
     {
     case RGBLED_STATUS_ALL_ON:
-        SET_BIT(led_dev->led_status_bit, 0);
-        SET_BIT(led_dev->led_status_bit, 1);
-        SET_BIT(led_dev->led_status_bit, 2);
+        CLEAR_BIT(led_dev->led_status_bit, 0);
+        CLEAR_BIT(led_dev->led_status_bit, 1);
+        CLEAR_BIT(led_dev->led_status_bit, 2);
         break;
     case RGBLED_STATUS_ALL_OFF:
         SET_BIT(led_dev->led_status_bit, 0);
@@ -154,50 +154,70 @@ static int32_t led_write(struct file *p_file, const char __user *buf, size_t cou
         SET_BIT(led_dev->led_status_bit, 2);
         break;
     case RGBLED_STATUS_BLUE_ON:
-        SET_BIT(led_dev->led_status_bit, 0);
+        CLEAR_BIT(led_dev->led_status_bit, 0);
+        SET_BIT(led_dev->led_status_bit, 1);
+        SET_BIT(led_dev->led_status_bit, 2);
         break;
     case RGBLED_STATUS_BLUE_OFF:
-        CLEAR_BIT(led_dev->led_status_bit, 0);
+        SET_BIT(led_dev->led_status_bit, 0);
         break;
     case RGBLED_STATUS_GREE_ON:
-        SET_BIT(led_dev->led_status_bit, 1);
+        SET_BIT(led_dev->led_status_bit, 0);
+        CLEAR_BIT(led_dev->led_status_bit, 1);
+        SET_BIT(led_dev->led_status_bit, 2);
         break;
     case RGBLED_STATUS_GREE_OFF:
-        CLEAR_BIT(led_dev->led_status_bit, 1);
-        break;
-    case RGBLED_STATUS_RED_ON:
-        SET_BIT(led_dev->led_status_bit, 2);
-        break;
-    case RGBLED_STATUS_RED_OFF:
-        CLEAR_BIT(led_dev->led_status_bit, 2);
-        break;
-    case RGBLED_STATUS_YELLOW_ON:
+        SET_BIT(led_dev->led_status_bit, 0);
         SET_BIT(led_dev->led_status_bit, 1);
         SET_BIT(led_dev->led_status_bit, 2);
         break;
-    case RGBLED_STATUS_YELLOW_OFF:
+    case RGBLED_STATUS_RED_ON:
+        SET_BIT(led_dev->led_status_bit, 0);
+        SET_BIT(led_dev->led_status_bit, 1);
+        CLEAR_BIT(led_dev->led_status_bit, 2);
+        break;
+    case RGBLED_STATUS_RED_OFF:
+        SET_BIT(led_dev->led_status_bit, 0);
+        SET_BIT(led_dev->led_status_bit, 1);
+        SET_BIT(led_dev->led_status_bit, 2);
+        break;
+    case RGBLED_STATUS_YELLOW_ON:
+        SET_BIT(led_dev->led_status_bit, 0);
         CLEAR_BIT(led_dev->led_status_bit, 1);
         CLEAR_BIT(led_dev->led_status_bit, 2);
         break;
+    case RGBLED_STATUS_YELLOW_OFF:
+        SET_BIT(led_dev->led_status_bit, 0);
+        SET_BIT(led_dev->led_status_bit, 1);
+        SET_BIT(led_dev->led_status_bit, 2);
+        break;
     case RGBLED_STATUS_CYAN_ON:
+        CLEAR_BIT(led_dev->led_status_bit, 1);
+        CLEAR_BIT(led_dev->led_status_bit, 0);
         SET_BIT(led_dev->led_status_bit, 2);
         break;
     case RGBLED_STATUS_CYAN_OFF:
-        CLEAR_BIT(led_dev->led_status_bit, 2);
-        break;
-    case RGBLED_STATUS_MAGENTA_ON:
+        SET_BIT(led_dev->led_status_bit, 0);
+        SET_BIT(led_dev->led_status_bit, 1);
         SET_BIT(led_dev->led_status_bit, 2);
         break;
-    case RGBLED_STATUS_MAGENTA_OFF:
+    case RGBLED_STATUS_MAGENTA_ON:
+        CLEAR_BIT(led_dev->led_status_bit, 0);
+        SET_BIT(led_dev->led_status_bit, 1);
         CLEAR_BIT(led_dev->led_status_bit, 2);
+        break;
+    case RGBLED_STATUS_MAGENTA_OFF:
+        SET_BIT(led_dev->led_status_bit, 0);
+        SET_BIT(led_dev->led_status_bit, 1);
+        SET_BIT(led_dev->led_status_bit, 2);
         break;
     default:
         break;
     }
 
-    gpio_set_value(led_dev->led_gpio_num[0], led_dev->led_status_bit << 0);
-    gpio_set_value(led_dev->led_gpio_num[1], led_dev->led_status_bit << 1);
-    gpio_set_value(led_dev->led_gpio_num[2], led_dev->led_status_bit << 2);
+    gpio_set_value(led_dev->led_gpio_num[0], GET_BIT(led_dev->led_status_bit, 0));
+    gpio_set_value(led_dev->led_gpio_num[1], GET_BIT(led_dev->led_status_bit, 1));
+    gpio_set_value(led_dev->led_gpio_num[2], GET_BIT(led_dev->led_status_bit, 2));
 
     return 0;
 }

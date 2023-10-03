@@ -2,7 +2,7 @@
  * @Description: rgbleds app
  * @Author: TOTHTOT
  * @Date: 2023-09-27 16:53:39
- * @LastEditTime: 2023-09-28 17:30:33
+ * @LastEditTime: 2023-09-29 10:18:11
  * @LastEditors: TOTHTOT
  * @FilePath: /aw_v3s_project/01_ctrl_rgbled/rgbled_app.c
  */
@@ -13,10 +13,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <stdlib.h>
 
 #define RGBLEDS_DEV_PATH "/dev/rgbled"  // rgbled device path
+#define TEST_LED_COL 0  // open test led col
 
-
+// rgbled状态, 必须保持xxx_on是奇数, xxx_off是偶数,且xxx_on在对应的xxx_off前面
 typedef enum
 {
     RGBLED_STATUS_NONE,
@@ -36,6 +38,7 @@ typedef enum
     RGBLED_STATUS_ALL_OFF,
     RGBLED_MAX_STATUS
 } rgbled_status_t;
+
 typedef struct rgbled_app
 {
     int rgbleds_fd;
@@ -82,14 +85,67 @@ int32_t end_app(rgbled_app_t *p_rgbled_st)
 }
 
 /**
- * @name: main
- * @msg: 
+ * @name: rgbled_toggle
+ * @msg: toggle rgbled status
+ * @param {rgbled_app_t} *p_dev_st
  * @return {*}
  * @author: TOTHTOT
- * @Date: 2023-09-28 16:25:35
+ * @Date: 2023-09-29 09:52:56
  */
-int main(void)
+uint8_t rgbled_toggle(rgbled_app_t *p_dev_st)
 {
+    if(p_dev_st->rgbled_status> RGBLED_STATUS_NONE&&p_dev_st->rgbled_status < RGBLED_MAX_STATUS)
+    {
+        // 如果是奇数表明是xxx_off的,减1状态推到xxx_on
+        if(p_dev_st->rgbled_status % 2==0)
+            p_dev_st->rgbled_status--;  // xxx_on
+        else 
+            p_dev_st->rgbled_status++;  //xxx_off
+
+        write(p_dev_st->rgbleds_fd, &p_dev_st->rgbled_status, sizeof(rgbled_status_t));
+        return 0;
+    }
+    else
+        return 1;
+}
+
+/**
+ * @name: rgbled_test_all_col
+ * @msg: test rgb led light color
+ * @param {rgbled_app_t} *p_dev_st
+ * @return {*}
+ * @author: TOTHTOT
+ * @Date: 2023-09-29 10:16:30
+ */
+void rgbled_test_all_col(rgbled_app_t *p_dev_st)
+{
+    rgbled_status_t led_status = RGBLED_STATUS_NONE;
+    while (led_status!=RGBLED_MAX_STATUS)
+    {
+      write(p_dev_st->rgbleds_fd, &led_status, sizeof(rgbled_status_t));
+      led_status++;
+      usleep(300000);   // 300ms
+    }
+    
+}
+
+/**
+ * @name: main
+ * @msg: main process
+ * @param {int} argc
+ * @param {char} *argv
+ * @return {*}
+ * @author: TOTHTOT
+ * @Date: 2023-09-29 08:29:12
+ */
+int main(int argc, char *argv[])
+{
+    if(argc != 2)
+    {
+        printf("app arg number error!\n");
+        return 1;
+    }
+    g_rgbleds_dev_t.rgbled_status = (rgbled_status_t)atoi(argv[1]);
     signal(SIGINT, sig_handle);
     g_rgbleds_dev_t.rgbleds_fd = open(RGBLEDS_DEV_PATH, O_RDWR);
     if(g_rgbleds_dev_t.rgbleds_fd < 0)
@@ -97,16 +153,19 @@ int main(void)
         printf("open() file fail\n");
         return -1;
     }
-
     printf("open rgbled device success!\n");
+
     while (g_rgbleds_dev_t.exit_flag == 0)
     {  
-        g_rgbleds_dev_t.rgbled_status = RGBLED_STATUS_ALL_ON;
-        write(g_rgbleds_dev_t.rgbleds_fd, &g_rgbleds_dev_t.rgbled_status, sizeof(rgbled_status_t));
+        #if (TEST_LED_COL == 1)
+        rgbled_test_all_col(&g_rgbleds_dev_t);
+        #else
+        if(rgbled_toggle(&g_rgbleds_dev_t) != 0)
+        {
+            printf("rgbled_toggle() fail!rgbleds_status = [%d]\n",g_rgbleds_dev_t.rgbled_status);
+        }
         usleep(200000);  // sleep 200ms
-        g_rgbleds_dev_t.rgbled_status = RGBLED_STATUS_ALL_OFF;
-        write(g_rgbleds_dev_t.rgbleds_fd, &g_rgbleds_dev_t.rgbled_status, sizeof(rgbled_status_t));
-        usleep(200000);  // sleep 200ms
+        #endif // TEST_LED_COL
     }
     
     end_app(&g_rgbleds_dev_t);
