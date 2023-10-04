@@ -2,7 +2,7 @@
  * @Description:
  * @Author: TOTHTOT
  * @Date: 2023-09-29 11:47:00
- * @LastEditTime: 2023-10-03 11:17:03
+ * @LastEditTime: 2023-10-03 11:59:48
  * @LastEditors: TOTHTOT
  * @FilePath: /aw_v3s_project/02_oled_0.96/oled_096_drive.c
  */
@@ -314,14 +314,6 @@ static int32_t oled_arg_init(oled_0_96_device_t *p_dev_st)
     oled_sendcmd(p_dev_st->client, 0x00); // 0x00
     oled_sendcmd(p_dev_st->client, 7); 
     
-    // oled_sendcmd(p_dev_st->client, 0xAE);
-    // oled_sendcmd(p_dev_st->client, 0x00);
-    // oled_sendcmd(p_dev_st->client, 0x10);
-    // oled_sendcmd(p_dev_st->client, 0x40);
-    // oled_sendcmd(p_dev_st->client, 0xa6);
-    // oled_sendcmd(p_dev_st->client, 0xa4);
-    // oled_sendcmd(p_dev_st->client, 0xa6);
-    // OLED_Cls(client);
     oled_sendcmd(p_dev_st->client, 0xaf);
     return 0;
 }
@@ -530,7 +522,7 @@ static int oled_probe(struct i2c_client *client, const struct i2c_device_id *id)
 }
 
 /**
- * @name:
+ * @name:oled_remove
  * @msg:
  * @param {i2c_client} *client
  * @return {*}
@@ -543,6 +535,7 @@ static int oled_remove(struct i2c_client *client)
     printk(KERN_INFO "oled remove start\n");
 
     oled_sendcmd(client, 0xAE);
+    framebuffer_release(info);
 
     backlight_device_unregister(info->bl_dev);
 
@@ -550,7 +543,6 @@ static int oled_remove(struct i2c_client *client)
 
     fb_deferred_io_cleanup(info);
     __free_pages(__va(info->fix.smem_start), get_order(info->fix.smem_len));
-    framebuffer_release(info);
 
     printk(KERN_INFO "oled remove success, close oled\n");
     return 0;
