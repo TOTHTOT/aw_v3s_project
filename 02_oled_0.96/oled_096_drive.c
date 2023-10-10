@@ -2,7 +2,7 @@
  * @Description:
  * @Author: TOTHTOT
  * @Date: 2023-09-29 11:47:00
- * @LastEditTime: 2023-10-03 11:59:48
+ * @LastEditTime: 2023-10-06 17:09:02
  * @LastEditors: TOTHTOT
  * @FilePath: /aw_v3s_project/02_oled_0.96/oled_096_drive.c
  */
@@ -499,7 +499,7 @@ static int oled_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     int32_t ret = 0;
 
-    printk(KERN_INFO "oled probe success\n");
+    // printk(KERN_INFO "oled probe success\n");
 
     g_oled_0_96_dev_st.client = client; // 赋值获取到的 设备信息从设备树中
 
@@ -517,7 +517,7 @@ static int oled_probe(struct i2c_client *client, const struct i2c_device_id *id)
         return 3;
     }
 
-    printk(KERN_INFO "dev addr = %x\n", g_oled_0_96_dev_st.client->addr);
+    // printk(KERN_INFO "dev addr = %x\n", g_oled_0_96_dev_st.client->addr);
     return 0; // 返回 0 表示设备探测成功
 }
 
@@ -532,7 +532,7 @@ static int oled_probe(struct i2c_client *client, const struct i2c_device_id *id)
 static int oled_remove(struct i2c_client *client)
 {
     struct fb_info *info = i2c_get_clientdata(client);
-    printk(KERN_INFO "oled remove start\n");
+    // printk(KERN_INFO "oled remove start\n");
 
     oled_sendcmd(client, 0xAE);
     framebuffer_release(info);
@@ -544,7 +544,7 @@ static int oled_remove(struct i2c_client *client)
     fb_deferred_io_cleanup(info);
     __free_pages(__va(info->fix.smem_start), get_order(info->fix.smem_len));
 
-    printk(KERN_INFO "oled remove success, close oled\n");
+    // printk(KERN_INFO "oled remove success, close oled\n");
     return 0;
 }
 
@@ -625,7 +625,7 @@ static ssize_t oled_fb_write(struct fb_info *info, const char __user *buf, size_
 
     *ppos += count;
 
-    printk(KERN_INFO "oled_fb_write()\n");
+    // printk(KERN_INFO "oled_fb_write()\n");
     return count;
 }
 
@@ -634,7 +634,7 @@ static void oled_fb_fillrect(struct fb_info *info, const struct fb_fillrect *rec
     oled_0_96_device_t *par = info->par;
     sys_fillrect(info, rect);
     oled_update_display(par);
-    printk(KERN_INFO "oled_fb_fillrect()\n");
+    // printk(KERN_INFO "oled_fb_fillrect()\n");
 }
 
 static void oled_fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
@@ -642,7 +642,7 @@ static void oled_fb_copyarea(struct fb_info *info, const struct fb_copyarea *reg
     oled_0_96_device_t *par = info->par;
     sys_copyarea(info, region);
     oled_update_display(par);
-    printk(KERN_INFO "oled_fb_copyarea()\n");
+    // printk(KERN_INFO "oled_fb_copyarea()\n");
 }
 
 static void oled_fb_imageblit(struct fb_info *info, const struct fb_image *image)
@@ -650,7 +650,7 @@ static void oled_fb_imageblit(struct fb_info *info, const struct fb_image *image
     oled_0_96_device_t *par = info->par;
     sys_imageblit(info, image);
     oled_update_display(par);
-    printk(KERN_INFO "oled_fb_imageblit()\n");
+    // printk(KERN_INFO "oled_fb_imageblit()\n");
 }
 
 static int oled_fb_blank(int blank_mode, struct fb_info *info)
@@ -661,7 +661,7 @@ static int oled_fb_blank(int blank_mode, struct fb_info *info)
         return oled_sendcmd(par->client, OLED_CMD_DISPLAY_OFF);
     else
         return oled_sendcmd(par->client, OLED_CMD_DISPLAY_ON);
-    printk(KERN_INFO "oled_fb_blank()\n");
+    // printk(KERN_INFO "oled_fb_blank()\n");
     return 0;
 }
 
@@ -689,14 +689,14 @@ static int32_t __init oled_init(void)
 {
     int32_t ret = 0;
 
-    printk(KERN_INFO "oled init start\n");
+    // printk(KERN_INFO "oled init start\n");
     ret = i2c_add_driver(&g_oled_driver_st);
     if (ret != 0)
     {
         printk(KERN_ERR "i2c_add_driver() error\n");
         return 1;
     }
-    printk(KERN_INFO "oled init success\n");
+    // printk(KERN_INFO "oled init success\n");
     return 0;
 }
 
@@ -709,7 +709,7 @@ static int32_t __init oled_init(void)
  */
 static void __exit oled_exit(void)
 {
-    printk(KERN_INFO "oled exit start\n");
+    // printk(KERN_INFO "oled exit start\n");
     // 删除 i2c 设备, 会调用 oled_remove()
     i2c_del_driver(&g_oled_driver_st);
     // 注销framebuffer
@@ -720,7 +720,7 @@ static void __exit oled_exit(void)
     cdev_del(&g_oled_0_96_dev_st.cdev);
     unregister_chrdev_region(g_oled_0_96_dev_st.devid, DEVICE_DEV_NUM);
 
-    printk(KERN_INFO "oled exit success\n");
+    // printk(KERN_INFO "oled exit success\n");
 }
 
 module_init(oled_init);

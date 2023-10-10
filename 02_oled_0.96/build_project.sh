@@ -3,7 +3,7 @@
  # @Description: build project scripts,just need change {BUILD_NAME},{BUILD_APP_NAME},{MAKE_FILE_MODULES_NAME} in other project.
  # @Author: TOTHTOT
  # @Date: 2023-09-29 08:48:21
- # @LastEditTime: 2023-10-01 10:01:16
+ # @LastEditTime: 2023-10-06 17:14:00
  # @LastEditors: TOTHTOT
  # @FilePath: /aw_v3s_project/02_oled_0.96/build_project.sh
 ### 
@@ -14,7 +14,7 @@ BUILD_NAME="oled_096_drive.ko"
 BUILD_APP_NAME="oled_096_app"
 MAKE_FILE_MODULES_NAME="oled_096_drive.o"
 
-CROSS_COMPLIER_TYPE="arm-none-linux-gnueabihf-gcc"
+CROSS_COMPLIER_TYPE="arm-linux-gnueabihf-gcc"
 NFS_MODULE_PATH="/home/yyh/Learn/aw_v3s/nfs/lib/modules/5.2.0-licheepi-zero+/"
 MAKE_FILE_KERNELDIR="/home/yyh/Learn/aw_v3s/linux"
 BUILD_APP_FLAG=1
