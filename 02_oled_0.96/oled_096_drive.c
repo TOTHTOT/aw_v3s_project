@@ -2,7 +2,7 @@
  * @Description:
  * @Author: TOTHTOT
  * @Date: 2023-09-29 11:47:00
- * @LastEditTime: 2023-10-10 16:55:48
+ * @LastEditTime: 2023-10-17 17:58:40
  * @LastEditors: TOTHTOT
  * @FilePath: /aw_v3s_project/02_oled_0.96/oled_096_drive.c
  */
@@ -42,7 +42,7 @@
 #define OLED_CMD_ADDR 0x80  // 发送指令的地址
 #define OLED_DATA_ADDR 0x40 // 发送数据的地址
 #define OLED_REFRESHRATE 1
-#define OLED_MAX_CONTRAST 255   // 最大对比度
+#define OLED_MAX_CONTRAST 255 // 最大对比度
 
 // oled 指令
 #define OLED_CMD_DISPLAY_OFF 0xae
@@ -59,8 +59,8 @@ typedef struct oled_0_96_drive
     int major; // dev num
     int minor; // dev num
 
-    struct i2c_client *client;  // i2c 设备
-    uint32_t contrast;  // 对比度
+    struct i2c_client *client; // i2c 设备
+    uint32_t contrast;         // 对比度
     // uint8_t *mmap_buffer;
     struct fb_info *info; // frame buffer
 } oled_0_96_device_t;
@@ -78,6 +78,7 @@ static int oled_remove(struct i2c_client *client);
 static int oledfb_get_brightness(struct backlight_device *bdev);
 static int oledfb_check_fb(struct backlight_device *bdev, struct fb_info *info);
 static int oledfb_update_bl(struct backlight_device *bdev);
+static int32_t oled_dev_exit(oled_0_96_device_t *p_dev_st);
 
 /* 变量声明 */
 static struct file_operations g_oled_fops_st;
@@ -108,10 +109,10 @@ static const struct fb_var_screeninfo oled_fb_var = {
     .blue.offset = 0,
 };
 static const struct backlight_ops oled_fb_bl_ops = {
-	.options	= BL_CORE_SUSPENDRESUME,
-	.update_status	= oledfb_update_bl,
-	.get_brightness	= oledfb_get_brightness,
-	.check_fb	= oledfb_check_fb,
+    .options = BL_CORE_SUSPENDRESUME,
+    .update_status = oledfb_update_bl,
+    .get_brightness = oledfb_get_brightness,
+    .check_fb = oledfb_check_fb,
 };
 static struct file_operations g_oled_fops_st = {
     .owner = THIS_MODULE,
@@ -276,46 +277,49 @@ static void oled_update_display(oled_0_96_device_t *p_dev_st)
  */
 static int32_t oled_arg_init(oled_0_96_device_t *p_dev_st)
 {
-    oled_sendcmd(p_dev_st->client, 0x81);
-    oled_sendcmd(p_dev_st->client, 0x7f);
+    int32_t ret = 0;
 
-    oled_sendcmd(p_dev_st->client, 0xa1);
-    oled_sendcmd(p_dev_st->client, 0xc8);
+    ret = oled_sendcmd(p_dev_st->client, 0x81);
+    ret = oled_sendcmd(p_dev_st->client, 0x7f);
 
-    oled_sendcmd(p_dev_st->client, 0xa8);
-    oled_sendcmd(p_dev_st->client, OLED_HEIGHT -1);
-    
-    oled_sendcmd(p_dev_st->client, 0xd3);
-    oled_sendcmd(p_dev_st->client, 0x00);
+    ret = oled_sendcmd(p_dev_st->client, 0xa1);
+    ret = oled_sendcmd(p_dev_st->client, 0xc8);
 
-    oled_sendcmd(p_dev_st->client, 0xd5);
-    oled_sendcmd(p_dev_st->client, 0x80);
+    ret = oled_sendcmd(p_dev_st->client, 0xa8);
+    ret = oled_sendcmd(p_dev_st->client, OLED_HEIGHT - 1);
 
-    oled_sendcmd(p_dev_st->client, 0xd9);
-    oled_sendcmd(p_dev_st->client, 0xf1);
+    ret = oled_sendcmd(p_dev_st->client, 0xd3);
+    ret = oled_sendcmd(p_dev_st->client, 0x00);
 
-    oled_sendcmd(p_dev_st->client, 0xda);
-    oled_sendcmd(p_dev_st->client, 0x12);
+    ret = oled_sendcmd(p_dev_st->client, 0xd5);
+    ret = oled_sendcmd(p_dev_st->client, 0x80);
 
-    oled_sendcmd(p_dev_st->client, 0xdb);
-    oled_sendcmd(p_dev_st->client, 0x40);
+    ret = oled_sendcmd(p_dev_st->client, 0xd9);
+    ret = oled_sendcmd(p_dev_st->client, 0xf1);
 
-    oled_sendcmd(p_dev_st->client, 0x8d);
-    oled_sendcmd(p_dev_st->client, 0x14);
-    
-    oled_sendcmd(p_dev_st->client, 0x20);
-    oled_sendcmd(p_dev_st->client, 0x00); // 0x00
+    ret = oled_sendcmd(p_dev_st->client, 0xda);
+    ret = oled_sendcmd(p_dev_st->client, 0x12);
 
-    oled_sendcmd(p_dev_st->client, 0x21);   // SSD1307FB_SET_COL_RANGE
-    oled_sendcmd(p_dev_st->client, 0x00); 
-    oled_sendcmd(p_dev_st->client, OLED_WIDTH -1); 
+    ret = oled_sendcmd(p_dev_st->client, 0xdb);
+    ret = oled_sendcmd(p_dev_st->client, 0x40);
 
-    oled_sendcmd(p_dev_st->client, 0x22);   // SSD1307FB_SET_PAGE_RANGE
-    oled_sendcmd(p_dev_st->client, 0x00); // 0x00
-    oled_sendcmd(p_dev_st->client, 7); 
-    
-    oled_sendcmd(p_dev_st->client, 0xaf);
-    return 0;
+    ret = oled_sendcmd(p_dev_st->client, 0x8d);
+    ret = oled_sendcmd(p_dev_st->client, 0x14);
+
+    ret = oled_sendcmd(p_dev_st->client, 0x20);
+    ret = oled_sendcmd(p_dev_st->client, 0x00); // 0x00
+
+    ret = oled_sendcmd(p_dev_st->client, 0x21); // SSD1307FB_SET_COL_RANGE
+    ret = oled_sendcmd(p_dev_st->client, 0x00);
+    ret = oled_sendcmd(p_dev_st->client, OLED_WIDTH - 1);
+
+    ret = oled_sendcmd(p_dev_st->client, 0x22); // SSD1307FB_SET_PAGE_RANGE
+    ret = oled_sendcmd(p_dev_st->client, 0x00); // 0x00
+    ret = oled_sendcmd(p_dev_st->client, 7);
+
+    ret = oled_sendcmd(p_dev_st->client, 0xaf);
+
+    return ret;
 }
 
 /**
@@ -397,7 +401,7 @@ static int32_t oled_fb_init(struct i2c_client *client, const struct i2c_device_i
     struct device_node *node = client->dev.of_node;
     struct fb_info *info = NULL;
     struct fb_deferred_io *oled_fb_defio = NULL;
-    oled_0_96_device_t *p_dev_st = NULL;
+    oled_0_96_device_t *p_dev_st = i2c_get_clientdata(client);
     int8_t bl_name[12];
     uint32_t vmem_size;
     uint8_t *vmem;
@@ -416,7 +420,7 @@ static int32_t oled_fb_init(struct i2c_client *client, const struct i2c_device_i
         return -ENOMEM;
     }
     // 指针相互引用
-    p_dev_st = info->par;
+    info->par = p_dev_st;
     p_dev_st->info = info;
     p_dev_st->client = client;
 
@@ -453,7 +457,6 @@ static int32_t oled_fb_init(struct i2c_client *client, const struct i2c_device_i
     info->fix.smem_len = vmem_size;
 
     fb_deferred_io_init(info);
-    i2c_set_clientdata(client, info);
 
     ret = register_framebuffer(info);
     if (ret)
@@ -471,7 +474,7 @@ static int32_t oled_fb_init(struct i2c_client *client, const struct i2c_device_i
                 ret);
         goto bl_init_error;
     }
-    
+
     p_dev_st->contrast = 127;
     bl->props.brightness = p_dev_st->contrast;
     bl->props.max_brightness = OLED_MAX_CONTRAST;
@@ -481,7 +484,7 @@ static int32_t oled_fb_init(struct i2c_client *client, const struct i2c_device_i
 
     return 0;
 bl_init_error:
-	unregister_framebuffer(info);
+    unregister_framebuffer(info);
 fb_alloc_error:
     framebuffer_release(info);
     return ret;
@@ -499,28 +502,71 @@ static int oled_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     int32_t ret = 0;
 
-    // printk(KERN_INFO "oled probe success\n");
+    printk(KERN_INFO "oled probe success\n");
+    i2c_set_clientdata(client, &g_oled_0_96_dev_st);
 
     g_oled_0_96_dev_st.client = client; // 赋值获取到的 设备信息从设备树中
 
     ret = oled_dev_init(&g_oled_0_96_dev_st, &g_oled_fops_st); // 注册设备到内核
     if (ret != 0)
-        return 1;
+    {
+        ret = 1;
+        printk(KERN_ERR "oled_dev_init() error\n");
+        goto dev_init_err;
+    }
     ret = oled_fb_init(client, id); // oled 的 framebuffer 初始化
     if (ret != 0)
-        return 2;
+    {
+        ret = 2;
+        printk(KERN_ERR "oled_fb_init() error\n");
+        goto arg_init_err;
+    }
     ret = oled_arg_init(&g_oled_0_96_dev_st); // 初始化 oled 屏幕参数
     if (ret != 0)
     {
-    	fb_deferred_io_cleanup(g_oled_0_96_dev_st.info);
-        framebuffer_release(g_oled_0_96_dev_st.info);
-        return 3;
+        ret = 3;
+        printk(KERN_ERR "oled_arg_init() error\n");
+        goto arg_init_err;
     }
 
     // printk(KERN_INFO "dev addr = %x\n", g_oled_0_96_dev_st.client->addr);
     return 0; // 返回 0 表示设备探测成功
+
+arg_init_err:
+    printk(KERN_ERR "arg_init_err\n");
+    oled_dev_exit(&g_oled_0_96_dev_st);
+dev_init_err:
+    return ret;
 }
 
+/**
+ * @name: oled_dev_exit
+ * @msg: 注销oled
+ * @param {oled_0_96_device_t} *p_dev_st
+ * @return {*}
+ * @author: TOTHTOT
+ * @Date: 2023-10-17 16:31:39
+ */
+static int32_t oled_dev_exit(oled_0_96_device_t *p_dev_st)
+{
+    struct fb_info *info = p_dev_st->info;
+
+    oled_sendcmd(p_dev_st->client, 0xAE);
+    framebuffer_release(info);
+
+    backlight_device_unregister(info->bl_dev);
+    unregister_framebuffer(info);
+
+    fb_deferred_io_cleanup(info);
+    __free_pages(__va(info->fix.smem_start), get_order(info->fix.smem_len));
+
+    device_destroy(p_dev_st->class, p_dev_st->devid);
+    class_destroy(p_dev_st->class);
+    cdev_del(&p_dev_st->cdev);
+    unregister_chrdev_region(p_dev_st->devid, DEVICE_DEV_NUM);
+
+    return 0;
+}
 /**
  * @name:oled_remove
  * @msg:
@@ -531,19 +577,10 @@ static int oled_probe(struct i2c_client *client, const struct i2c_device_id *id)
  */
 static int oled_remove(struct i2c_client *client)
 {
-    struct fb_info *info = i2c_get_clientdata(client);
+    oled_0_96_device_t *p_dev_st = i2c_get_clientdata(client);
     // printk(KERN_INFO "oled remove start\n");
 
-    oled_sendcmd(client, 0xAE);
-    framebuffer_release(info);
-
-    backlight_device_unregister(info->bl_dev);
-
-    unregister_framebuffer(info);
-
-    fb_deferred_io_cleanup(info);
-    __free_pages(__va(info->fix.smem_start), get_order(info->fix.smem_len));
-
+    oled_dev_exit(p_dev_st);
     // printk(KERN_INFO "oled remove success, close oled\n");
     return 0;
 }
@@ -571,31 +608,31 @@ static struct i2c_driver g_oled_driver_st = {
 
 static int oledfb_update_bl(struct backlight_device *bdev)
 {
-	oled_0_96_device_t *par = bl_get_data(bdev);
-	int ret;
-	int brightness = bdev->props.brightness;
+    oled_0_96_device_t *par = bl_get_data(bdev);
+    int ret;
+    int brightness = bdev->props.brightness;
 
-	par->contrast = brightness;
+    par->contrast = brightness;
 
-	ret = oled_sendcmd(par->client, 0x81);
-	if (ret < 0)
-		return ret;
-	ret = oled_sendcmd(par->client, par->contrast);
-	if (ret < 0)
-		return ret;
-	return 0;
+    ret = oled_sendcmd(par->client, 0x81);
+    if (ret < 0)
+        return ret;
+    ret = oled_sendcmd(par->client, par->contrast);
+    if (ret < 0)
+        return ret;
+    return 0;
 }
 
 static int oledfb_get_brightness(struct backlight_device *bdev)
 {
-	oled_0_96_device_t *par = bl_get_data(bdev);
+    oled_0_96_device_t *par = bl_get_data(bdev);
 
-	return par->contrast;
+    return par->contrast;
 }
 
 static int oledfb_check_fb(struct backlight_device *bdev, struct fb_info *info)
 {
-	return (info->bl_dev == bdev);
+    return (info->bl_dev == bdev);
 }
 
 static ssize_t oled_fb_write(struct fb_info *info, const char __user *buf, size_t count, loff_t *ppos)
@@ -715,10 +752,10 @@ static void __exit oled_exit(void)
     // 注销framebuffer
     // unregister_framebuffer(&g_oled_info_st);
 
-    device_destroy(g_oled_0_96_dev_st.class, g_oled_0_96_dev_st.devid);
-    class_destroy(g_oled_0_96_dev_st.class);
-    cdev_del(&g_oled_0_96_dev_st.cdev);
-    unregister_chrdev_region(g_oled_0_96_dev_st.devid, DEVICE_DEV_NUM);
+    // device_destroy(g_oled_0_96_dev_st.class, g_oled_0_96_dev_st.devid);
+    // class_destroy(g_oled_0_96_dev_st.class);
+    // cdev_del(&g_oled_0_96_dev_st.cdev);
+    // unregister_chrdev_region(g_oled_0_96_dev_st.devid, DEVICE_DEV_NUM);
 
     // printk(KERN_INFO "oled exit success\n");
 }

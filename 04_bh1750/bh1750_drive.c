@@ -2,7 +2,7 @@
  * @Description: bh1750 驱动, addr引脚接地 地址0x23 iic通信速率400khz
  * @Author: TOTHTOT
  * @Date: 2023-09-29 11:47:00
- * @LastEditTime: 2023-10-16 10:26:45
+ * @LastEditTime: 2023-10-17 16:21:20
  * @LastEditors: TOTHTOT
  * @FilePath: /aw_v3s_project/04_bh1750/bh1750_drive.c
  */
@@ -185,9 +185,9 @@ static int32_t bh1750_arg_init(bh1750_drive_t *p_dev_st)
     int8_t read_buf[2];
     uint16_t temp;
 
-    bh1750_send_cmd(p_dev_st->client, BH1750_COMMAND_POWER_ON);
-    bh1750_send_cmd(p_dev_st->client, BH1750_COMMAND_CONTINUOUSLY_H_RESOLUTION_MODE2);
-    bh1750_read_dat(p_dev_st->client, read_buf, 2);
+    ret = bh1750_send_cmd(p_dev_st->client, BH1750_COMMAND_POWER_ON);
+    ret = bh1750_send_cmd(p_dev_st->client, BH1750_COMMAND_CONTINUOUSLY_H_RESOLUTION_MODE2);
+    ret = bh1750_read_dat(p_dev_st->client, read_buf, 2);
 
     temp = ((uint16_t)(read_buf[0])) << 8 | read_buf[1];
     // temp = (float)temp/1.2 ;
@@ -276,16 +276,23 @@ static int32_t bh1750_dev_exit(bh1750_drive_t *p_dev_st)
  */
 static int bh1750_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-    i2c_set_clientdata(client, &g_bh1750_dev_st);
+    bh1750_drive_t *p_dev_st = NULL;
 
     g_bh1750_dev_st.client = client;
+    i2c_set_clientdata(client, &g_bh1750_dev_st);
+    p_dev_st = i2c_get_clientdata(client);
 
-    if (bh1750_dev_init(&g_bh1750_dev_st, &g_bh1750_fops_st) != 0)
+    if (bh1750_dev_init(p_dev_st, &g_bh1750_fops_st) != 0)
     {
         printk(KERN_ERR "dev_init() fail\n");
         return 1;
     }
-    bh1750_arg_init(&g_bh1750_dev_st);
+    if(bh1750_arg_init(p_dev_st) != 0)
+    {
+        printk(KERN_ERR "arg_init() fail\n");
+        bh1750_dev_exit(p_dev_st);
+        return 2;
+    }
     printk(KERN_INFO "%s probed\n", DEVICE_NAME);
 
     return 0;

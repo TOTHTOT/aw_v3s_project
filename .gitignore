@@ -52,3 +52,4 @@ Mkfile.old
 dkms.conf
 01_ctrl_rgbled/tags
 .vscode/settings.json
+02_oled_0.96/u8g2-arm-linux/

@@ -2,7 +2,7 @@
  * @Description: dht11 驱动
  * @Author: TOTHTOT
  * @Date: 2023-09-29 11:47:00
- * @LastEditTime: 2023-10-10 10:17:04
+ * @LastEditTime: 2023-10-20 13:51:48
  * @LastEditors: TOTHTOT
  * @FilePath: /aw_v3s_project/03_dht11/dht11_drive.c
  */
@@ -24,6 +24,11 @@
 #include <asm/io.h>
 #include <linux/platform_device.h>
 #include <linux/of_device.h>
+#include <linux/poll.h>
+#include <linux/sched.h>
+#include <linux/uaccess.h>
+#include <linux/timer.h>
+#include <linux/jiffies.h>
 
 #define DEVICE_DEV_NUM 1
 #define DEVICE_NAME "dht11"                 // 显示到 /dev下的设备名字
@@ -63,6 +68,11 @@ typedef struct dht11_drive
 
     struct device_node *nd; // dev tree node info
     int32_t dht11_dq_gpio_num;
+
+    struct timer_list dht11_ctrl_fre_tim; // 内核定时器用于控制 dht11 读取数据频率
+    bool tim_is_run;                      // 定时器是否在运行
+    wait_queue_head_t dht11_queue;        // dht11 读取数据等待队列
+    uint8_t dht11_ready;                  // dht11是否准备完成 == 1完成, == 0 未完成
 
     dht11_data_t sensor_data_st; // dht11 数据
 } dht11_drive_t;
@@ -180,8 +190,8 @@ static uint8_t dht11_read_bit(int32_t io_num)
         return 0;
 }
 
-/**read() fail[-1]
-
+/**
+ * @name: dht11_read_byte
  * @msg: 读取1字节
  * @param {int32_t} io_num
  * @return {读取到的数据}
@@ -258,9 +268,53 @@ static uint8_t dht11_read_data(int32_t io_num, u_int16_t *temp, u_int16_t *humi)
 static int dht11_open(struct inode *inode, struct file *p_file)
 {
     p_file->private_data = &g_dht11_dev_st;
+
+    // 初始化等待队列
+    init_waitqueue_head(&g_dht11_dev_st.dht11_queue);
+
     printk(KERN_INFO "%s open\n", DEVICE_NAME);
+
     return 0;
 }
+
+/**
+ * @name: dht11_poll
+ * @msg:
+ * @param {file} *p_file
+ * @return {*}
+ * @author: TOTHTOT
+ * @Date: 2023-10-16 17:47:31
+ */
+static __poll_t dht11_poll(struct file *p_file, struct poll_table_struct *p_wait)
+{
+    int mask = 0;
+
+    dht11_drive_t *p_dev_st = p_file->private_data;
+    if (p_dev_st->dht11_ready == 0)
+    {
+        // printk(KERN_INFO "dht11_poll() running\n");
+        poll_wait(p_file, &p_dev_st->dht11_queue, p_wait); // 添加到等待队列
+        if (p_dev_st->tim_is_run == false)                 // 定时器不在运行才开启
+        {
+            // printk(KERN_INFO "mod_timer()\n");
+            p_dev_st->tim_is_run = true;
+            mod_timer(&p_dev_st->dht11_ctrl_fre_tim, jiffies + HZ);
+        }
+        else
+        {
+            printk(KERN_INFO "mod_timer() fail\n");
+        }
+    }
+    else
+    {
+        p_dev_st->dht11_ready = 0;
+        mask = POLLIN | POLLRDNORM;
+        // printk(KERN_INFO "dht11_poll() return = 0x%x\n", mask);
+    }
+
+    return mask;
+}
+
 /**
  * @name: dht11_read
  * @msg: 读取 dht11 数据
@@ -277,36 +331,41 @@ static ssize_t dht11_read(struct file *p_file, char __user *user, size_t bytesiz
 {
     dht11_drive_t *p_dev_st = p_file->private_data;
     int32_t ret = 0;
+    int32_t read_retry = 10;
 
     p_dev_st->sensor_data_st.temp = 0;
     p_dev_st->sensor_data_st.humi = 0;
 
-    ret = dht11_read_data(p_dev_st->dht11_dq_gpio_num, &p_dev_st->sensor_data_st.temp, &p_dev_st->sensor_data_st.humi);
-    gpio_direction_output(p_dev_st->dht11_dq_gpio_num, 1);
-    if (ret == 0)
+    do
     {
-        // 将温度和湿度信息拷贝到user指针中
-        if (copy_to_user(user, &p_dev_st->sensor_data_st, sizeof(dht11_data_t)))
+        ret = dht11_read_data(p_dev_st->dht11_dq_gpio_num, &p_dev_st->sensor_data_st.temp, &p_dev_st->sensor_data_st.humi);
+        gpio_direction_output(p_dev_st->dht11_dq_gpio_num, 1);
+        if (ret == 0)
         {
-            printk(KERN_ERR "%s:copy_to_user() fail\n", DEVICE_NAME);
-            return -2;
+            // 将温度和湿度信息拷贝到user指针中
+            if (copy_to_user(user, &p_dev_st->sensor_data_st, sizeof(dht11_data_t)))
+            {
+                printk(KERN_ERR "%s:copy_to_user() fail\n", DEVICE_NAME);
+                return -2;
+            }
+            else
+            {
+                // printk(KERN_INFO "%s:dht11_read_data() success\n", DEVICE_NAME);
+                return sizeof(dht11_data_t);
+            }
         }
         else
         {
-            // printk(KERN_INFO "%s:dht11_read_data() success\n", DEVICE_NAME);
-            return sizeof(dht11_data_t);
+            if (copy_to_user(user, &p_dev_st->sensor_data_st, sizeof(dht11_data_t)))
+            {
+                // printk(KERN_ERR "%s:copy_to_user() fail\n", DEVICE_NAME);
+                return -2;
+            }
+            printk(KERN_ERR "%s:dht11_read_data() fail[%d]\n", DEVICE_NAME, ret);
+            return -1;
         }
-    }
-    else
-    {
-        if (copy_to_user(user, &p_dev_st->sensor_data_st, sizeof(dht11_data_t)))
-        {
-            // printk(KERN_ERR "%s:copy_to_user() fail\n", DEVICE_NAME);
-            return -2;
-        }
-        printk(KERN_ERR "%s:dht11_read_data() fail[%d]\n", DEVICE_NAME, ret);
-        return -1;
-    }
+        delay_ms(50);
+    } while (read_retry);
 }
 
 /**
@@ -323,7 +382,10 @@ static int32_t dht11_release(struct inode *p_inode, struct file *p_file)
     dht11_drive_t *p_dev_st = p_file->private_data;
 
     gpio_direction_output(p_dev_st->dht11_dq_gpio_num, 1); // io口拉高
-    p_file->private_data = NULL;
+    // 关闭驱动时删除定时器, 确保下次开启,这些标志位正常
+    del_timer(&p_dev_st->dht11_ctrl_fre_tim);
+    p_dev_st->tim_is_run = false;
+    p_dev_st->dht11_ready = 0; 
 
     printk(KERN_INFO "%s released\n", DEVICE_NAME);
     return 0;
@@ -333,7 +395,27 @@ static struct file_operations g_dht11_fops_st = {
     .read = dht11_read,
     .open = dht11_open,
     .release = dht11_release,
+    .poll = dht11_poll,
 };
+
+/**
+ * @name: dht11_tim_cb
+ * @msg: 定时器回调函数
+ * @param {unsigned long} data
+ * @return {*}
+ * @author: TOTHTOT
+ * @Date: 2023-10-17 13:51:37
+ */
+void dht11_tim_cb(struct timer_list *tim_p_st)
+{
+    dht11_drive_t *p_dev_st = container_of(tim_p_st, dht11_drive_t, dht11_ctrl_fre_tim);
+
+    wake_up_interruptible(&p_dev_st->dht11_queue); // 时间到, 唤醒阻塞进程
+    p_dev_st->tim_is_run = false;
+    p_dev_st->dht11_ready = 1; // 允许读取数据
+
+    // printk(KERN_INFO "%s timer running\n", DEVICE_NAME);
+}
 
 /**
  * @name: dht11_gpio_init
@@ -466,6 +548,7 @@ static int32_t dht11_dev_exit(dht11_drive_t *p_dev_st)
     cdev_del(&p_dev_st->cdev);
     unregister_chrdev_region(p_dev_st->devid, DEVICE_DEV_NUM);
 
+    del_timer(&p_dev_st->dht11_ctrl_fre_tim); // 删除定时器
     gpio_free(p_dev_st->dht11_dq_gpio_num);
 
     return 0;
@@ -481,18 +564,24 @@ static int32_t dht11_dev_exit(dht11_drive_t *p_dev_st)
  */
 static int dht11_probe(struct platform_device *pdev)
 {
-    platform_set_drvdata(pdev, &g_dht11_dev_st);
+    dht11_drive_t *p_dev_st = NULL;
 
-    if (dht11_dev_init(&g_dht11_dev_st, &g_dht11_fops_st) != 0)
+    platform_set_drvdata(pdev, &g_dht11_dev_st);
+    p_dev_st = platform_get_drvdata(pdev);
+
+    if (dht11_dev_init(p_dev_st, &g_dht11_fops_st) != 0)
     {
         printk(KERN_ERR "dev_init() fail\n");
         return 1;
     }
-    if (dht11_gpio_init(&g_dht11_dev_st) != 0)
+    if (dht11_gpio_init(p_dev_st) != 0)
     {
         printk(KERN_ERR "gpio_init() fail\n");
         return 2;
     }
+
+    // 在模块初始化期间初始化定时器
+    timer_setup(&p_dev_st->dht11_ctrl_fre_tim, dht11_tim_cb, 0);
 
     dev_info(&pdev->dev, "initialized (%s)\n", DEVICE_NAME);
 
